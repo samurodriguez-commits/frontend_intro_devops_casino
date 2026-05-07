@@ -94,17 +94,21 @@ casino-frontend/
 
 ## Variables de entorno y configuración
 
-Angular 17 inyecta las variables en build-time vía
-`src/environments/environment*.ts`. El campo a editar es:
+`src/environments/environment.prod.ts` viene con `apiBaseUrl: ''`
+(cadena vacía). Esto es **intencional**: en producción el JS del
+navegador hace llamadas a **rutas relativas** (`/api/...`) que
+aterrizan en el mismo Nginx que sirvió el HTML, y ese Nginx las
+reenvía al backend mediante un **reverse proxy** (`location /api/`
+→ `proxy_pass http://${BACKEND_HOST}:3000/api/`).
 
-```typescript
-// environment.prod.ts
-apiBaseUrl: 'http://CHANGE-ME-EC2-BACKEND:3000'
-```
+> **¿Por qué reverse proxy?** Porque el `Security Group` del backend
+> solo permite tráfico desde el `Security Group` del frontend. Si el
+> navegador del usuario llamara directo al backend, lo bloquearía.
+> Con el reverse proxy el navegador solo habla con el frontend.
 
-> **En la EP2:** después de levantar la instancia EC2 del backend,
-> reemplacen ese valor antes de hacer `npm run build` (o, mejor,
-> sustitúyanlo en el `Dockerfile` con un `ARG` y un `sed`).
+`environment.ts` (modo desarrollo local) sí apunta a
+`http://localhost:3000` para que `ng serve` funcione contra un
+backend Node corriendo aparte.
 
 ---
 
