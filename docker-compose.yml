@@ -1,0 +1,8 @@
+services:
+  frontend:
+    image: tu-usuario-docker/casino-frontend:latest 
+    build: .
+    environment:
+      - BACKEND_HOST=172.31.13.255 
+    ports:
+      - "80:8080"
