@@ -1,4 +1,4 @@
-name: Deploy frontend-intro-devops-casino
+name: Deploy casino-frontend
 
 on:
   push:
@@ -6,46 +6,67 @@ on:
       - deploy
 
 jobs:
-  build-push-deploy:
+  build-test-push-deploy:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Configure AWS
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run frontend tests
+        run: npm test -- --watch=false --browsers=ChromeHeadless
+
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
+
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Login ECR
-        id: login-ecr  
+      - name: Login to Amazon ECR
+        id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and Push image
+      - name: Build Docker image
         run: |
-          docker build -t casino-frontend:${{ github.sha }} .
-          docker tag casino-frontend:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/casino-frontend:${{ github.sha }}
-          docker tag casino-frontend:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/casino-frontend:latest
-          docker push ${{ steps.login-ecr.outputs.registry }}/casino-frontend:${{ github.sha }}
-          docker push ${{ steps.login-ecr.outputs.registry }}/casino-frontend:latest
+          docker build \
+          -t casino-frontend:${{ github.sha }} .
 
-      - name: Actualizar Kubeconfig
+      - name: Tag Docker image
         run: |
-          aws eks update-kubeconfig --name casino-cluster --region ${{ secrets.AWS_REGION }}
+          docker tag casino-frontend:${{ github.sha }} \
+          ${{ steps.login-ecr.outputs.registry }}/casino-frontend:${{ github.sha }}
+          docker tag casino-frontend:${{ github.sha }} \
+          ${{ steps.login-ecr.outputs.registry }}/casino-frontend:latest
+          docker tag casino-frontend:${{ github.sha }} \
+          ${{ steps.login-ecr.outputs.registry }}/casino-frontend:v1.0.0
 
-      - name: Crear o actualizar Secret en EKS
+      - name: Push Docker image
         run: |
-          kubectl create secret generic casino-secrets \
-            --from-literal=DB_URL='${{ secrets.DB_URL }}' \
-            --from-literal=JWT_SECRET='${{ secrets.JWT_SECRET }}' \
-            --from-literal=DB_USER='${{ secrets.DB_USER }}' \
-            --from-literal=DB_PASSWORD='${{ secrets.DB_PASSWORD }}' \
-            --dry-run=client -o yaml | kubectl apply -f -
+          docker push \
+          ${{ steps.login-ecr.outputs.registry }}/casino-frontend:${{ github.sha }}
+          docker push \
+          ${{ steps.login-ecr.outputs.registry }}/casino-frontend:latest
+          docker push \
+          ${{ steps.login-ecr.outputs.registry }}/casino-frontend:v1.0.0
 
-      - name: Desplegar en EKS
+      - name: Configure kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+          --name ${{ secrets.EKS_CLUSTER }} \
+          --region ${{ secrets.AWS_REGION }}
+
+      - name: Deploy frontend to EKS
         run: |
           kubectl apply -f kubernetes/
-          kubectl rollout restart deployment/casino-frontend  
+          kubectl rollout restart deployment/casino-frontend
