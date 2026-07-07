@@ -23,19 +23,28 @@ jobs:
       - name: Login ECR
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build image
+      - name: Build and Push image
         run: |
-          docker build -t frontend-intro-devops-casino:${{ github.sha }} .
+          docker build -t apuestas-service:${{ github.sha }} .
+          docker tag apuestas-service:${{ github.sha }} ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/apuestas-service:${{ github.sha }}
+          docker tag apuestas-service:${{ github.sha }} ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/apuestas-service:latest
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/apuestas-service:${{ github.sha }}
+          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/apuestas-service:latest
 
-      - name: Tag image
+      - name: Actualizar Kubeconfig
         run: |
-          docker tag frontend-intro-devops-casino:${{ github.sha }} \
-          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/frontend-intro-devops-casino:${{ github.sha }}
+          aws eks update-kubeconfig --name casino-cluster --region ${{ secrets.AWS_REGION }}
 
-          docker tag frontend-intro-devops-casino:${{ github.sha }} \
-          ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/frontend-intro-devops-casino:latest
-
-      - name: Push image
+      - name: Crear o actualizar Secret en EKS
         run: |
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/frontend-intro-devops-casino:${{ github.sha }}
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/frontend-intro-devops-casino:latest
+          kubectl create secret generic casino-secrets \
+            --from-literal=DB_URL='${{ secrets.DB_URL }}' \
+            --from-literal=JWT_SECRET='${{ secrets.JWT_SECRET }}' \
+            --from-literal=DB_USER='${{ secrets.DB_USER }}' \
+            --from-literal=DB_PASSWORD='${{ secrets.DB_PASSWORD }}' \
+            --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Desplegar en EKS
+        run: |
+          kubectl apply -f kubernetes/
+          kubectl rollout restart deployment/apuestas-service
