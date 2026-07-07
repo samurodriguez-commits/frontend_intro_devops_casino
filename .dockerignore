@@ -1,0 +1,13 @@
+node_modules
+dist
+.angular
+.git
+.gitignore
+.github
+.vscode
+.DS_Store
+README.md
+Dockerfile
+default.conf.template
+*.log
+coverage
