@@ -21,15 +21,16 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login ECR
+        id: login-ecr  
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and Push image
         run: |
-          docker build -t apuestas-service:${{ github.sha }} .
-          docker tag apuestas-service:${{ github.sha }} ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/apuestas-service:${{ github.sha }}
-          docker tag apuestas-service:${{ github.sha }} ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/apuestas-service:latest
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/apuestas-service:${{ github.sha }}
-          docker push ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.${{ secrets.AWS_REGION }}.amazonaws.com/apuestas-service:latest
+          docker build -t casino-frontend:${{ github.sha }} .
+          docker tag casino-frontend:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/casino-frontend:${{ github.sha }}
+          docker tag casino-frontend:${{ github.sha }} ${{ steps.login-ecr.outputs.registry }}/casino-frontend:latest
+          docker push ${{ steps.login-ecr.outputs.registry }}/casino-frontend:${{ github.sha }}
+          docker push ${{ steps.login-ecr.outputs.registry }}/casino-frontend:latest
 
       - name: Actualizar Kubeconfig
         run: |
@@ -47,4 +48,4 @@ jobs:
       - name: Desplegar en EKS
         run: |
           kubectl apply -f kubernetes/
-          kubectl rollout restart deployment/apuestas-service
+          kubectl rollout restart deployment/casino-frontend  
