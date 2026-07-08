@@ -71,6 +71,9 @@ jobs:
         run: |
           kubectl create secret generic casino-secrets \
             --from-literal=DB_URL='${{ secrets.DB_URL }}' \
+            --from-literal=DB_HOST='postgres' \
+            --from-literal=DB_PORT='5432' \
+            --from-literal=DB_NAME='casino_db' \
             --from-literal=DB_USER='${{ secrets.DB_USER }}' \
             --from-literal=DB_PASSWORD='${{ secrets.DB_PASSWORD }}' \
             --from-literal=JWT_SECRET='${{ secrets.JWT_SECRET }}' \
